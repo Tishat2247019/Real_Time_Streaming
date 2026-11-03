@@ -1,0 +1,117 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage[colorlinks=true,linkcolor=black,citecolor=black,urlcolor=black]{hyperref}
+
+\setlist{itemsep=3pt,topsep=4pt}
+
+\title{Change-Characteristic-Aware Window Selection for\\
+Unsupervised Concept Drift Detection in Real-Time Text Streams}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Research Gap}
+
+In a data stream, the data patterns can change over time. This is called concept drift. A drift detector must find real changes fast, and it must not raise false alarms.
+
+Many unsupervised detectors compare recent data with older data. They use a window to hold the recent data. A short window reacts fast but is sensitive to noise. A long window is stable but reacts slowly.
+
+ADWIN-U \cite{assis2025} already uses an adaptive window without labels. So this idea alone is not new. But ADWIN-U has some limits:
+\begin{itemize}
+\item It uses one fixed confidence level.
+\item When it finds drift, it removes the whole old part of the window. It does not check how strong or how lasting the change is.
+\item It was tested only on numeric streams, not on text.
+\end{itemize}
+
+Choosing the window size is also still an open problem for unsupervised detectors \cite{lukats2025}. For text streams, there are very few datasets with known drift points \cite{garcia2024}.
+
+\section{Research Questions}
+
+\begin{description}[leftmargin=0pt,style=nextline]
+\item[RQ1 (main).] Can a window-selection policy that uses the characteristics of the change improve the trade-off between detection delay, false alarms and computational cost, compared with ADWIN-U and other unsupervised detectors?
+\item[RQ2.] Does the policy work better for some drift types (abrupt, gradual, recurring) or some drift strengths?
+\item[RQ3.] How much extra time and memory does the policy need?
+\end{description}
+
+\section{Contribution}
+
+\begin{enumerate}[label=\textbf{C\arabic*.}]
+\item \textbf{A clear window-selection policy.} The policy uses how strong the change is and how long it lasts. Then it chooses one action: cut the window fully, hold the window, or cut it partly.
+\item \textbf{A fair comparison.} We compare with ADWIN-U and other detectors, including ADWIN-U with different confidence levels. We measure detection delay, false alarms, missed drift, time and memory.
+\item \textbf{A test on text streams.} We apply ADWIN-U style detection to text, using sentence embeddings.
+\item \textbf{Test streams with known drift.} We build abrupt, gradual and recurring drift from real text data.
+\end{enumerate}
+
+We do not claim that adaptive windows or unsupervised monitoring are new. We only claim to test the window policy. It may or may not work better, and we will report both cases.
+
+\section{Short Literature Review}
+
+\begin{itemize}
+\item \textbf{ADWIN} \cite{bifet2007} keeps a window of variable length. It cuts the window when two parts of it have different averages. Usually it needs labels or classifier errors.
+\item \textbf{ADWIN-U} \cite{assis2025} removes the need for labels. It monitors simple statistics of each example, like skewness and kurtosis. It uses a fixed confidence level and a full cut on drift.
+\item \textbf{Hinder et al.} \cite{hinder2024} survey unsupervised drift detection. They show that window selection is the first step of most methods.
+\item \textbf{Lukats et al.} \cite{lukats2025} compare unsupervised detectors on real streams. They suggest better ways to choose the window size as future work.
+\item \textbf{Chen et al.} \cite{chen2024} use short and long variable windows for abrupt and gradual drift. Their work is on frequent pattern mining, not on unsupervised detection in text.
+\item \textbf{Klinkenberg and Joachims} \cite{klinkenberg2000} and \textbf{Kuncheva and \v{Z}liobait\.{e}} \cite{kuncheva2009} choose the window size from classifier error or theory. This needs labels.
+\item \textbf{Garcia et al.} \cite{garcia2024} review drift in text streams. They find very few text datasets with labeled drift.
+\end{itemize}
+
+In our search so far, we did not find a paper with this exact policy. We will check this again with a full literature search.
+
+\section{Datasets}
+
+We use only text data. Each document is turned into a vector with a pre-trained sentence encoder \cite{reimers2019}. Labels are not used for drift monitoring.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{p{3.2cm}p{5.4cm}p{4.6cm}}
+\toprule
+Dataset & Use & Drift points \\
+\midrule
+AG News \cite{zhang2015} & News with 4 topics. We build abrupt, gradual and recurring drift by changing the topic mix. & Known \\
+20 Newsgroups \cite{lang1995} & About 18.8k posts, 20 groups. Swapping very different topics gives strong drift. Swapping similar groups gives weak drift. & Known \\
+Amazon Reviews 2023 \cite{amazon2023} & Reviews with time stamps. We use one product category as a real stream. & Not known. We use indirect checks. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For first tests, we also use simple numeric streams with known drift. These help us debug the policy before we use text.
+
+\begin{thebibliography}{99}\small
+
+\bibitem{assis2025} D.~N. Assis and V.~M.~A. Souza. ADWIN-U: adaptive windowing for unsupervised drift detection on data streams. \emph{Knowledge and Information Systems}, 67(11):10005--10034, 2025.
+
+\bibitem{bifet2007} A.~Bifet and R.~Gavald\`a. Learning from time-changing data with adaptive windowing. In \emph{Proc.\ SIAM International Conference on Data Mining}, pp.\ 443--448, 2007.
+
+\bibitem{hinder2024} F.~Hinder, V.~Vaquet, and B.~Hammer. One or two things we know about concept drift---a survey on monitoring in evolving environments. Part A: Detecting concept drift. \emph{Frontiers in Artificial Intelligence}, 7, 2024.
+
+\bibitem{lukats2025} D.~Lukats, O.~Zielinski, A.~Hahn, and F.~Stahl. A benchmark and survey of fully unsupervised concept drift detectors on real-world data streams. \emph{International Journal of Data Science and Analytics}, 19:1--31, 2025.
+
+\bibitem{chen2024} J.~Chen et al. Multi-type concept drift detection under a dual-layer variable sliding window in frequent pattern mining with cloud computing. \emph{Journal of Cloud Computing}, 13, article 40, 2024.
+
+\bibitem{klinkenberg2000} R.~Klinkenberg and T.~Joachims. Detecting concept drift with support vector machines. In \emph{Proc.\ International Conference on Machine Learning}, pp.\ 487--494, 2000.
+
+\bibitem{kuncheva2009} L.~I. Kuncheva and I.~\v{Z}liobait\.{e}. On the window size for classification in changing environments. \emph{Intelligent Data Analysis}, 13(6):861--872, 2009.
+
+\bibitem{garcia2024} C.~M. Garcia, R.~S. Abilio, A.~L. Koerich, A.~S. Britto~Jr., and J.~P. Barddal. Concept drift adaptation in text stream mining settings: a systematic review. \emph{ACM Transactions on Intelligent Systems and Technology}, 2024.
+
+\bibitem{reimers2019} N.~Reimers and I.~Gurevych. Sentence-BERT: sentence embeddings using Siamese BERT-networks. In \emph{Proc.\ EMNLP-IJCNLP}, 2019.
+
+\bibitem{zhang2015} X.~Zhang, J.~Zhao, and Y.~LeCun. Character-level convolutional networks for text classification. In \emph{Advances in Neural Information Processing Systems}, 2015.
+
+\bibitem{lang1995} K.~Lang. NewsWeeder: learning to filter netnews. In \emph{Proc.\ International Conference on Machine Learning}, 1995.
+
+\bibitem{amazon2023} McAuley Lab. Amazon Reviews 2023 (dataset). \url{https://amazon-reviews-2023.github.io/}
+
+\end{thebibliography}
+
+\end{document}
