@@ -37,11 +37,11 @@ ADWIN \cite{bifet2007} avoids a fixed size by keeping a variable-length window a
 
 We study a window-selection policy built on ADWIN-U. The detector first looks at how strong and how persistent the unlabeled evidence is, and then chooses between a full cut, a hold, and a partial cut of the window. We ask whether this improves the balance between delay, false alarms, and missed drift on text streams, how the effect depends on drift type and magnitude, what it costs in time and memory, and whether results on injected drift carry over to a real stream with unknown drift points.
 
-The contributions are:
-(i) a precisely defined window-selection policy with a graded cut and a hold state, which contains ADWIN-U as a special case;
-(ii) a controlled comparison with ADWIN-U and fair baselines at matched false-alarm rates;
-(iii) an evaluation of ADWIN-U-style windowing on text embeddings; and
-(iv) a reproducible protocol for text-drift evaluation, which addresses the lack of text benchmarks with labeled drift points \cite{garcia2024review}.
+The main contributions of our work are:
+(i) A precisely defined window-selection policy with a graded cut and a hold state, which contains ADWIN-U as a special case;
+(ii) A controlled comparison with ADWIN-U and fair baselines at matched false-alarm rates;
+(iii) An evaluation of ADWIN-U-style windowing on text embeddings; and
+(iv) A reproducible protocol for text-drift evaluation, which addresses the lack of text benchmarks with labeled drift points \cite{garcia2024review}.
 
 We do not claim to introduce adaptive windows, unsupervised monitoring, or text drift detection in general. Whether the policy is new still needs a systematic literature search, and all benefits are hypotheses.
 
