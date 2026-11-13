@@ -104,15 +104,7 @@ Window choice shapes what a detector sees, ADWIN-U gives a label-free adaptive w
 \section{Proposed Methodology}
 \label{sec:method}
 
-\subsection{Problem setting}
-
-Let the stream be documents $d_1,d_2,\dots$ arriving one at a time. Each document is mapped to an embedding $x_i\in\mathbb{R}^{384}$ by a frozen encoder. The detector sees only $x_i$ and must output alarm times $\hat t_1,\hat t_2,\dots$ It never sees labels. Labels exist only for two purposes: to construct streams with known drift, and to train an optional downstream classifier for the BAR score. The goal is to alarm soon after each true drift, to raise few alarms when nothing changed, to miss no drift, and to run within the time and memory limits of streaming.
-
-\subsection{Pipeline overview}
-
-Fig.~\ref{fig:pipeline} shows the pipeline. Documents are encoded once with a frozen Sentence-BERT model (\texttt{all-MiniLM-L6-v2}, which is distilled from MiniLM \cite{wang2020}) and the vectors are cached. Detector timings therefore do not include encoding, and the encoding cost is reported on its own. For each embedding the detector computes one scalar statistic $s_i$ and inserts it into a bucketed window. After each check the policy looks at the evidence and applies one window action. The window update feeds back into the bucketed window.
-
-\begin{figure*}[t]
+\begin{figure*}[!t]
 \centering
 \begin{tikzpicture}[
   box/.style={draw, rounded corners=2pt, align=center, minimum height=11mm, text width=2.15cm, inner sep=3pt, font=\footnotesize, fill=blue!6},
@@ -140,44 +132,21 @@ Fig.~\ref{fig:pipeline} shows the pipeline. Documents are encoded once with a fr
 \label{fig:pipeline}
 \end{figure*}
 
-\subsection{Monitored statistic}
+\subsection{Problem setting}
 
-Following ADWIN-U, we compute one statistic per example over its feature values, so for an embedding the statistic is taken across its 384 components. The main choices are kurtosis and skewness, which ADWIN-U found most useful with multiple detectors. We keep both the single-detector and the multiple-detector form. The multiple-detector form needs predicted classes, which we would get from a small classifier trained on the initial documents. It uses predictions only, never true labels.
+The stream is a sequence of documents $d_1,d_2,\dots$ arriving one at a time. Each document is mapped to an embedding $x_i$ by a frozen encoder. The detector sees only $x_i$, never a label, and outputs alarm times. Labels are used only to build streams with known drift and to train an optional downstream classifier. The goal is to alarm soon after each true drift, raise few alarms when nothing changed, miss no drift, and stay within streaming time and memory limits.
 
-It is not clear that these statistics respond to topic drift in embeddings. A topic change moves the vector, but it may leave the shape of the value distribution across components almost unchanged. We therefore test this first. As a fallback we use the cosine distance between $x_i$ and the centroid of the current window. Keeping this centroid needs one vector sum per bucket, which costs $O(d\log W)$ memory for dimension $d$.
+\subsection{Pipeline overview}
 
-\subsection{Baseline detector and bound}
+Fig.~\ref{fig:pipeline} shows the pipeline. Documents are encoded once with a frozen Sentence-BERT model (\texttt{all-MiniLM-L6-v2}, distilled from MiniLM \cite{wang2020}), and the vectors are cached, so detector timings exclude encoding. Following ADWIN-U, the detector computes one scalar statistic $s_i$ per embedding, such as kurtosis or skewness over its components, and inserts it into ADWIN's bucketed window. Since topic drift may not change these statistics, we test this first and keep the cosine distance to the window centroid as a fallback. After each check, the policy looks at the evidence and applies one window action.
 
-The window $W$ is stored as buckets. At each check ADWIN-U tests the bucket boundaries as splits $W=W_1\cdot W_2$ with lengths $n_1,n_2$ and $n=n_1+n_2$. With $m=1/(1/n_1+1/n_2)$ and $\delta'=\delta/n$, the bound from \cite{bifet2007} is
-\begin{equation}
-\varepsilon(\delta)=\sqrt{\tfrac{2}{m}\,\sigma_W^2\ln\tfrac{2}{\delta'}}+\tfrac{2}{3m}\ln\tfrac{2}{\delta'},
-\label{eq:bound}
-\end{equation}
-where $\sigma_W^2$ is the variance of the values in $W$. Let $g=\hat\mu_{W_1}-\hat\mu_{W_2}$ be the signed gap. ADWIN-U declares drift and drops $W_1$ when $|g|\ge\varepsilon(\delta)$ for some split. Since $\varepsilon$ decreases as $\delta$ grows, a lax level $\delta_w>\delta_s$ gives a smaller bound $\varepsilon_w<\varepsilon_s$.
+
 
 \subsection{Window-selection policy}
 
-The policy uses two levels, a strict level $\delta_s$ and a lax level $\delta_w>\delta_s$, with bounds $\varepsilon_s>\varepsilon_w$ from Eq.~(\ref{eq:bound}). It also uses a persistence length $k$ and a counter $c$. At each check it takes the split with the largest ratio $|g|/\varepsilon_s$ and applies the rules in Table~\ref{tab:policy}. Fig.~\ref{fig:states} shows the same logic as a state diagram.
+The window $W$ is split into an older part $W_1$ and a recent part $W_2$, and the signed gap of their means is $g=\hat\mu_{W_1}-\hat\mu_{W_2}$. ADWIN-U cuts $W_1$ when $|g|$ exceeds one bound $\varepsilon$ derived from a Hoeffding-type inequality \cite{bifet2007}. Our policy computes the bound at a strict level $\delta_s$ and a lax level $\delta_w>\delta_s$, giving $\varepsilon_s>\varepsilon_w$, and adds a persistence counter $c$. Fig.~\ref{fig:states} shows the logic. A strong gap ($|g|\ge\varepsilon_s$) causes a full cut, as in ADWIN-U. A weak gap ($\varepsilon_w\le|g|<\varepsilon_s$) starts a hold: the window is not cut, a warning is raised, and $c$ counts consecutive weak checks with the same sign of $g$. If the gap vanishes or changes sign, the hold is released. If it persists for $k$ checks, a graded cut is applied.
 
-\begin{table}[t]
-\centering
-\caption{Window-selection policy. All evidence is unlabeled.}
-\label{tab:policy}
-\small
-\begin{tabular}{p{2.55cm}p{3.45cm}p{1.05cm}}
-\toprule
-Evidence & Window action & Output \\
-\midrule
-$|g|\ge\varepsilon_s$ & Full cut: drop $W_1$, reset $c$ & Alarm \\
-$\varepsilon_w\le|g|<\varepsilon_s$, first time & Hold: no cut, set $c=1$, store sign of $g$ & Warning \\
-Weak again, same sign, $c<k$ & Hold: $c\leftarrow c+1$ & Warning \\
-Weak, same sign, $c=k$ & Graded cut: drop the oldest $\rho n_1$ items of $W_1$, reset $c$ & Alarm \\
-$|g|<\varepsilon_w$ or sign flips & Release hold, reset $c$; window grows & None \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{figure}[t]
+\begin{figure}[!t]
 \centering
 \begin{tikzpicture}[
   st/.style={draw, rounded corners=2pt, align=center, minimum height=8mm, minimum width=1.9cm, inner sep=3pt, font=\footnotesize, fill=blue!6},
@@ -200,9 +169,9 @@ $|g|<\varepsilon_w$ or sign flips & Release hold, reset $c$; window grows & None
 \label{fig:states}
 \end{figure}
 
-The graded cut removes a share $\rho$ of the older sub-window. We set $\rho=\min(1,|g|/\varepsilon_s)$. In the weak zone this gives $\varepsilon_w/\varepsilon_s\le\rho<1$, so a gap just under the strict bound removes almost all of $W_1$, a gap just above the lax bound removes a smaller part, and the share is always between the two. Because $W_1$ is stored as buckets, the cut removes whole buckets from the tail until at least $\rho n_1$ items are gone. Fig.~\ref{fig:cuts} compares the two cuts. The parameters $\delta_s$, $\delta_w$, $k$, and the rule for $\rho$ are open choices that we will tune and ablate.
+The graded cut drops only the oldest share $\rho=\min(1,|g|/\varepsilon_s)$ of $W_1$, so a larger gap removes more (Fig.~\ref{fig:cuts}). The reason to expect a gain is that a gradual or subtle drift may keep $|g|$ below $\varepsilon_s$ for a long time, even though the old data already differ from the new data. A persistent weak gap is evidence of this, and the hold state keeps a one-off blip from causing a cut.
 
-\begin{figure}[t]
+\begin{figure}[!t]
 \centering
 \begin{tikzpicture}[
   seg/.style={draw, minimum height=5mm, inner sep=0pt, font=\scriptsize},
@@ -225,43 +194,18 @@ The graded cut removes a share $\rho$ of the older sub-window. We set $\rho=\min
 \label{fig:cuts}
 \end{figure}
 
-Two properties follow from the design. If $\delta_w=\delta_s$, the weak zone is empty and the policy is exactly ADWIN-U, so ADWIN-U is a special case and the comparison is clean. And the reason to expect a gain is that a gradual or subtle drift may keep the gap below $\varepsilon_s$ for a long time while the old data in $W_1$ already differ from the new data. A persistent weak gap in one direction is evidence of this. Cutting part of $W_1$ then should shorten the delay. The hold state keeps a short blip, which appears once and disappears, from causing a cut. Both effects are hypotheses to test.
-
-The lax test does not carry the false-alarm guarantee of the strict bound once persistence is used, because several consecutive checks on overlapping data are not independent. We will therefore measure false alarms on drift-free streams instead of relying on the bound.
-
-\subsection{Computational cost}
-
-The policy adds a counter, a stored sign, and one comparison per check, which is $O(1)$ state and work. A graded cut removes buckets from the tail, and since every item enters and leaves the window once, this cost is amortized constant per instance. We therefore expect the $O(\log W)$ time and memory of ADWIN-U to remain, with an extra $O(d\log W)$ memory if the centroid fallback is used. This is a design goal. We will measure per-instance latency and peak memory to check it.
+Three design points complete the picture. If $\delta_w=\delta_s$ the weak zone is empty and the policy equals ADWIN-U, so ADWIN-U is a special case. The policy adds only a counter and a sign per check and cuts whole buckets, so we expect ADWIN-U's $O(\log W)$ cost to remain, which we will measure. The lax test does not carry the strict bound's false-alarm guarantee once persistence is used, so we will measure false alarms on drift-free streams. The parameters $\delta_s$, $\delta_w$, $k$, and $\rho$ are open choices to tune and ablate.
 
 \subsection{Evaluation plan}
 
-\paragraph{Datasets and drift injection}
-Table~\ref{tab:data} lists the datasets. AG News \cite{zhang2015} has four topics, and we build drift by changing the topic mix over time. For abrupt drift the mix switches at one point. For gradual drift the share of the new concept follows a sigmoid over a transition width, a construction used in common stream generators \cite{bifet2010}. For recurring drift the stream returns to an earlier mix. Drift magnitude is controlled with 20 Newsgroups \cite{lang1995}. Swapping groups from different macro-topics gives strong drift, and swapping sibling groups such as two hardware groups gives subtle drift. For a real stream we use timestamped Amazon product reviews \cite{ni2019} in time order. Its drift points are unknown, so we use proxies: the alarm rate, downstream accuracy for a given label budget, and alignment with a known external event. We will check the license of each dataset before use.
+\paragraph{Data}
+We build drift on AG News \cite{zhang2015} by changing the topic mix: a switch at one point for abrupt drift, a sigmoid transition for gradual drift \cite{bifet2010}, and a return to an earlier mix for recurring drift. On 20 Newsgroups \cite{lang1995}, swapping groups from different macro-topics gives strong drift, and swapping sibling groups gives subtle drift. As a real stream we use timestamped Amazon reviews \cite{ni2019} in time order. Its drift points are unknown, so we use proxies: alarm rate, downstream accuracy for a given label budget, and alignment with a known event.
 
-\begin{table}[t]
-\centering
-\caption{Planned datasets.}
-\label{tab:data}
-\small
-\begin{tabular}{>{\raggedright\arraybackslash}p{1.85cm}>{\raggedright\arraybackslash}p{3.6cm}>{\raggedright\arraybackslash}p{1.4cm}}
-\toprule
-Dataset & Role & Drift truth \\
-\midrule
-AG News & Abrupt, gradual, recurring drift by topic mix & Known \\
-20 Newsgroups & Strong vs.\ subtle drift via macro-topics or sibling groups & Known \\
-Amazon reviews & Real stream in time order & Unknown \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\paragraph{Baselines}
-We compare against ADWIN-U (single and multiple detectors, with kurtosis and skewness) and against plain ADWIN on the same statistic with a grid of $\delta$ values. These two address the obvious objection that any gain comes from tuning $\delta$. We also add a two-threshold warning/alarm variant, which tests whether a warning zone alone is enough. Further baselines are a KSWIN-style fixed-window test \cite{raab2020} and a discriminative detector in the style of D3 \cite{gozuacik2019}.
-
-\paragraph{Metrics and protocol}
-On streams with known drift we report mean time to detection, false alarms per 1,000 instances, missed-drift rate, the window-length trace, per-instance latency, and peak memory. BAR \cite{assis2025} is a secondary score. To compare detectors fairly, we first set each detector's parameters so that all reach the same false-alarm rate on a drift-free stream, and then compare delay. Each setting is run with several random stream orders, and detectors are ranked with the Friedman test and the Nemenyi post-hoc test, as in ADWIN-U and following Dem\v{s}ar \cite{demsar2006}. To find which part of the policy matters (RQ2), we run ablations: hold only (warning without a graded cut), graded cut without the persistence requirement, and the full policy.
+\paragraph{Baselines and metrics}
+We compare against ADWIN-U (single and multiple detectors), plain ADWIN with a grid of $\delta$ values, a two-threshold warning/alarm variant, a KSWIN-style fixed-window test \cite{raab2020}, and a D3-style discriminative detector \cite{gozuacik2019}. The first three address the objection that any gain comes only from tuning $\delta$ or adding a warning zone. We report mean time to detection, false alarms per 1,000 instances, missed-drift rate, window length, per-instance latency, and peak memory, with BAR \cite{assis2025} as a secondary score. Detectors are first set to the same false-alarm rate on a drift-free stream, run on several random stream orders, and ranked with the Friedman and Nemenyi tests \cite{demsar2006}. Ablations (hold only, graded cut without persistence, full policy) show which part matters.
 
 \paragraph{Hypotheses}
-H1: at the same false-alarm rate, the policy has lower delay than ADWIN-U on gradual and subtle drift. H2: on abrupt and strong drift it performs about the same as ADWIN-U, since a full cut already suits it. H3: the added cost per instance is small and constant. Each can turn out false, and a negative result is still a result.
+At the same false-alarm rate, we expect lower delay than ADWIN-U on gradual and subtle drift, similar results on abrupt strong drift, and a small constant extra cost per instance. Each can turn out false.
 
 %--------------------------------------------------------------------
 \section{Current Status and Next Steps}
