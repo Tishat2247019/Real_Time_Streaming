@@ -75,7 +75,6 @@ ADWIN-U \cite{assis2025} keeps the ADWIN windowing and replaces the monitored va
 
 Garcia et al.\ reviewed drift adaptation in text stream mining and point out that few text benchmarks come with labeled drift points \cite{garcia2024review}. Text is turned into vectors with pre-trained encoders such as Sentence-BERT \cite{reimers2019}. Whether the simple statistics that work for numeric sensor data also react to topic drift in embeddings has not been tested. To our knowledge, ADWIN-U-style windowing has not been evaluated on text streams, but this too must be confirmed by the planned literature search.
 
-\subsection{Summary of the gap}
 
 Window choice shapes what a detector sees, ADWIN-U gives a label-free adaptive window, and text streams lack a tested protocol. What is missing is a rule that lets the strength and persistence of unlabeled evidence decide how the window changes, together with an evaluation of that rule on text.
 
