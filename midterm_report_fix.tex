@@ -50,7 +50,14 @@
 %--------------------------------------------------------------------
 \section{Introduction}
 
-Text is produced continuously by news feeds, review sites and social platforms. Their topics and vocabulary change over time and a model trained on older documents slowly becomes outdated. For example a news classifier encounters new subjects and terms after a major event. This change in the data-generating process is called concept drift \cite{gama2014,lu2019}. Real-time systems must notice it because the usual remedy is to update the model on recent data which costs computation and often new annotations. Text streams also show three characteristics of big data. They have high velocity as documents arrive continuously and must be processed in a single pass. They have variety because the documents are unstructured and differ in topic, source and style. And their veracity is uncertain since labels are missing and the true drift points are usually unknown.
+Text is produced continuously by news feeds, review sites and social platforms. Their topics and vocabulary change over time and a model trained on older documents slowly becomes outdated. For example a news classifier encounters new subjects and terms after a major event. This change in the data-generating process is called concept drift \cite{gama2014,lu2019} (Fig.~\ref{fig:drift}). Real-time systems must notice it because the usual remedy is to update the model on recent data which costs computation and often new annotations. Text streams also show three characteristics of big data. They have high velocity as documents arrive continuously and must be processed in a single pass. They have variety because the documents are unstructured and differ in topic, source and style. And their veracity is uncertain since labels are missing and the true drift points are usually unknown.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\linewidth]{figures/concept_drift.pdf}
+\caption{Concept drift. (a) The distribution of incoming documents changes from $P_t(X)$ to $P_{t+\Delta}(X)$ at the drift point; the dotted curve shows the old distribution. (b) Common drift types by how the concept changes over time.}
+\label{fig:drift}
+\end{figure}
 
 
 For text, the problem is harder because labels arrive late or never \cite{garcia2024review}. Classic detectors watch a classifier's error rate and need the true label after every prediction \cite{gama2004,bifet2007} so a text detector has to work without labels. It should identify a genuine change quickly while avoiding alarms caused by ordinary fluctuations. A late alarm keeps an outdated model in use whereas a false alarm can trigger an unnecessary update and may need additional labeling costs. Lukats et al.\ \cite{lukats2025} showed that accuracy-based scores can favor detectors that fire often, highlighting the need to evaluate detection delay and false alarms separately.
