@@ -79,7 +79,7 @@ The main contributions of our work are:
 
 Our contribution is not the adaptive window or the label-free monitoring itself which ADWIN and ADWIN-U already provide. It is the rule that decides how the window changes after evidence of drift and its evaluation on text.
 
-The rest of the paper is organized as follows. Section~\ref{sec:related} covers related work and Section~\ref{sec:method} explains the proposed method and how we plan to evaluate it.
+The rest of the paper is organized as follows. Section~\ref{sec:related} covers related work and Section~\ref{sec:method} explains the proposed method and Section~\ref{sec:exp} describes how we plan to evaluate it.
 
 %--------------------------------------------------------------------
 \section{Background and Related Work}
@@ -115,7 +115,7 @@ In summary, window choice shapes what a detector sees, ADWIN-U provides a label-
 \section{Proposed Methodology}
 \label{sec:method}
 
-This section first defines the problem and gives an overview of the framework. It then describes each stage of the detector and ends with the experimental design used to evaluate it.
+This section first defines the problem and gives an overview of the framework. It then describes each stage of the detector and its cost.
 
 \begin{figure*}[!t]
 \centering
@@ -148,7 +148,7 @@ s_i^{\mathrm{skew}}=\frac{1}{D}\sum_{j=1}^{D}z_{ij}^{3},\quad
 z_{ij}=\frac{x_{ij}-\bar x_i}{\sigma_i}.
 \label{eq:stat}
 \end{equation}
-These statistics worked best with multiple detectors on numeric streams in \cite{assis2025}, but a change of topic may leave the shape of an embedding's components unchanged. We therefore test them first (RQ1 in Section~\ref{sec:rq}).
+These statistics worked best with multiple detectors on numeric streams in \cite{assis2025}, but a change of topic may leave the shape of an embedding's components unchanged. We therefore test them first and compare them with the centroid signal (Section~\ref{sec:exp}).
 
 \subsubsection{Centroid-distance signal}
 As a backup signal that is closer to the meaning of the text, we use the cosine distance \cite{salton1975} between $x_i$ and a running centroid $c_i$. Cosine similarity is also the standard way to compare Sentence-BERT embeddings \cite{reimers2019}:
@@ -290,19 +290,11 @@ Compared with ADWIN-U, the policy stores one counter and one sign and evaluates 
 \subsubsection{False alarms}
 The strict threshold keeps ADWIN's false-alarm guarantee, but a graded cut is triggered by the relaxed threshold together with persistence, so that guarantee no longer holds for it. We therefore measure false alarms on drift-free streams and calibrate all detectors to the same false-alarm rate before comparing them (Section~\ref{sec:protocol}).
 
-\subsection{Experimental design}
+%--------------------------------------------------------------------
+\section{Experimental Design}
+\label{sec:exp}
 
-\subsubsection{Research questions}
-\label{sec:rq}
-The experiments answer four questions.
-\begin{enumerate}[label=RQ\arabic*:, leftmargin=*]
-\item Do the per-instance statistics in Eq.~\eqref{eq:stat} react to topic drift in sentence embeddings, and how do they compare with the centroid signal in Eq.~\eqref{eq:cos}?
-\item At a matched false-alarm rate, does the policy reduce detection delay and missed drift compared with ADWIN-U, and how does the effect depend on drift type and magnitude?
-\item Does the policy keep the per-instance time and memory of ADWIN-U?
-\item Do the findings on injected drift carry over to a real stream with unknown drift points?
-\end{enumerate}
-
-\subsubsection{Datasets and drift construction}
+\subsection{Datasets and drift construction}
 Table~\ref{tab:data} lists the datasets. On AG News \cite{zhang2015} we create drift by changing the mix of its four topic classes. Abrupt drift switches from one mix to another at a single point $t_d$. Gradual drift uses the sigmoid transition of Bifet et al.\ \cite{bifet2009}, which is also used in MOA \cite{bifet2010}. In this transition a document is drawn from the new mix with probability
 \begin{equation}
 p(t)=\frac{1}{1+e^{-4(t-t_d)/w}},
@@ -325,10 +317,10 @@ Amazon reviews & Real stream in time order & Unknown \\
 \end{tabular}
 \end{table}
 
-\subsubsection{Baselines}
+\subsection{Baselines}
 We compare against ADWIN-U with single and multiple detectors \cite{assis2025}, plain ADWIN over a grid of $\delta$ values, a two-threshold warning and alarm variant of ADWIN, a KSWIN-style fixed-window test \cite{raab2020} and a D3-style discriminative detector \cite{gozuacik2019}. The $\delta$ grid and the warning variant check whether any gain comes only from tuning $\delta$ or from adding a warning zone rather than from the policy itself. All detectors receive the same signal, so differences come from the windowing.
 
-\subsubsection{Evaluation metrics}
+\subsection{Evaluation metrics}
 \label{sec:metrics}
 An alarm counts as a true detection of drift $t_m$ if it is the first alarm in the interval $[t_m,t_m+\Delta_a]$, where $\Delta_a$ is an acceptance window. All other alarms are false alarms. For gradual drift, $t_m$ is the start of the transition. Over a stream of $N$ instances with $N_{\mathrm{FA}}$ false alarms and a set $\mathcal{D}\subseteq\mathcal{T}$ of detected drifts, we report the standard detection measures \cite{gama2014,bifet2017}
 \begin{align}
@@ -338,7 +330,7 @@ An alarm counts as a true detection of drift $t_m$ if it is the first alarm in t
 \end{align}
 which are the mean time to detection, false alarms per 1,000 instances and missed-drift rate. For efficiency we report the mean window length, per-instance latency, peak memory and throughput in documents per second. BAR \cite{assis2025} is reported as a secondary measure. Following \cite{lukats2025}, accuracy-based scores are not used as the main criterion because they can favor detectors that fire often.
 
-\subsubsection{Experimental protocol}
+\subsection{Experimental protocol}
 \label{sec:protocol}
 First, the main parameter of every detector ($\delta$, or $\delta_s$ for our policy) is tuned on the drift-free streams so that all detectors reach the same $\mathrm{FA}_{1k}$. Each detector is then run on several random orderings of every drifting stream. Detectors are ranked per stream and compared with the Friedman test followed by the Nemenyi post-hoc test \cite{demsar2006}. An ablation compares three variants: hold only (persistent weak evidence leads to a full cut), graded cut without persistence ($k=1$) and the full policy. A sensitivity study varies $\delta_w/\delta_s$ and $k$. Detector timings exclude encoding, since embeddings are cached.
 %--------------------------------------------------------------------
