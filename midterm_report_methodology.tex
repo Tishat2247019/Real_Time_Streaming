@@ -111,18 +111,17 @@ Garcia et al.\ reviewed drift adaptation in text stream mining and point out tha
 
 In summary, window choice shapes what a detector sees, ADWIN-U provides a label-free adaptive window and text streams lack a tested evaluation protocol. What is still missing is a rule that uses the strength and persistence of unlabeled evidence to decide how the window changes and an evaluation of that rule on text.
 
-%--------------------------------------------------------------------
-\section{Proposed Methodology}
-\label{sec:method}
-
-This section first defines the problem and gives an overview of the framework. It then describes each stage of the detector and its cost.
-
 \begin{figure*}[!t]
 \centering
 \includegraphics[width=\linewidth]{figures/pipeline.pdf}
 \caption{Overview of the proposed framework. Embeddings are computed once and cached, so the timed part covers only the detector. Shaded boxes mark the new component.}
 \label{fig:pipeline}
 \end{figure*}
+
+\section{Methodology}
+\label{sec:method}
+
+This section first defines the problem and gives an overview of the framework. It then describes each stage of the detector and its cost.
 
 \subsection{Problem formulation}
 \label{sec:problem}
@@ -178,6 +177,29 @@ where $\delta$ is the confidence level and $m$ is the harmonic mean of $n_1$ and
 \subsection{Window-selection policy}
 \label{sec:policy}
 
+\begin{figure}[!htbp]
+\centering
+\begin{tikzpicture}[
+  seg/.style={draw, minimum height=5mm, inner sep=0pt, font=\scriptsize},
+  lab/.style={font=\scriptsize, anchor=east}
+]
+\def\a{3.6} \def\b{1.8} \def\d{1.6} \pgfmathsetmacro{\r}{\a-\d}
+\node[lab] at (0,0) {Before};
+\node[seg, minimum width=\a cm, fill=gray!20, anchor=west] (a1) at (0.1,0) {older $W_1$ ($n_1$)};
+\node[seg, minimum width=\b cm, fill=white, anchor=west] (a2) at (\a+0.1,0) {recent $W_2$};
+\node[lab] at (0,-0.9) {Full cut};
+\node[seg, minimum width=\a cm, pattern=north east lines, pattern color=black!50, anchor=west] at (0.1,-0.9) {};
+\node[seg, minimum width=\b cm, fill=white, anchor=west] at (\a+0.1,-0.9) {$W_2$ kept};
+\node[lab] at (0,-1.8) {Graded cut};
+\node[seg, minimum width=\d cm, pattern=north east lines, pattern color=black!50, anchor=west] at (0.1,-1.8) {};
+\node[seg, minimum width=\r cm, fill=gray!20, anchor=west] at (\d+0.1,-1.8) {$W_1$ kept};
+\node[seg, minimum width=\b cm, fill=white, anchor=west] at (\a+0.1,-1.8) {$W_2$};
+\draw[<->, thin] (0.1,-2.3) -- node[font=\scriptsize, below] {dropped: oldest $\rho n_1$} (\d+0.1,-2.3);
+\end{tikzpicture}
+\caption{Window after a full cut (all of $W_1$ dropped, hatched) and after a graded cut (only the oldest part of $W_1$ dropped).}
+\label{fig:cuts}
+\end{figure}
+
 The policy has three parts: a test at two confidence levels, a hold state that tracks persistence and a graded cut. Fig.~\ref{fig:states} shows the states and Algorithm~\ref{alg:policy} gives the full procedure.
 
 \subsubsection{Two-level test}
@@ -227,30 +249,7 @@ A graded cut removes only the oldest part of $W_1$ (Fig.~\ref{fig:cuts}). We pro
 \end{equation}
 and the oldest $\lceil\rho\, n_1\rceil$ instances are dropped, rounded to whole buckets. Because a graded cut follows weak evidence, $\rho$ lies between $\varepsilon_w/\varepsilon_s$ and $1$, so a gap close to the strict threshold removes almost all of $W_1$ and a gap close to the relaxed threshold removes less. The reasoning behind this rule is that gradual or subtle drift can keep $|g|$ below $\varepsilon_s$ for a long time even after the old data no longer match the new data. ADWIN-U would keep the stale data until the gap finally crosses $\varepsilon_s$. The graded cut removes the oldest and most outdated part earlier while keeping the more recent part of $W_1$ in case the change is small. Both cuts raise an alarm, reset $c$ and, for the centroid signal, reset $c_i$.
 
-\begin{figure}[!t]
-\centering
-\begin{tikzpicture}[
-  seg/.style={draw, minimum height=5mm, inner sep=0pt, font=\scriptsize},
-  lab/.style={font=\scriptsize, anchor=east}
-]
-\def\a{3.6} \def\b{1.8} \def\d{1.6} \pgfmathsetmacro{\r}{\a-\d}
-\node[lab] at (0,0) {Before};
-\node[seg, minimum width=\a cm, fill=gray!20, anchor=west] (a1) at (0.1,0) {older $W_1$ ($n_1$)};
-\node[seg, minimum width=\b cm, fill=white, anchor=west] (a2) at (\a+0.1,0) {recent $W_2$};
-\node[lab] at (0,-0.9) {Full cut};
-\node[seg, minimum width=\a cm, pattern=north east lines, pattern color=black!50, anchor=west] at (0.1,-0.9) {};
-\node[seg, minimum width=\b cm, fill=white, anchor=west] at (\a+0.1,-0.9) {$W_2$ kept};
-\node[lab] at (0,-1.8) {Graded cut};
-\node[seg, minimum width=\d cm, pattern=north east lines, pattern color=black!50, anchor=west] at (0.1,-1.8) {};
-\node[seg, minimum width=\r cm, fill=gray!20, anchor=west] at (\d+0.1,-1.8) {$W_1$ kept};
-\node[seg, minimum width=\b cm, fill=white, anchor=west] at (\a+0.1,-1.8) {$W_2$};
-\draw[<->, thin] (0.1,-2.3) -- node[font=\scriptsize, below] {dropped: oldest $\rho n_1$} (\d+0.1,-2.3);
-\end{tikzpicture}
-\caption{Window after a full cut (all of $W_1$ dropped, hatched) and after a graded cut (only the oldest part of $W_1$ dropped).}
-\label{fig:cuts}
-\end{figure}
-
-\begin{algorithm}[!t]
+\begin{algorithm}[htbp]
 \caption{Window-selection policy (one check)}
 \label{alg:policy}
 \small
