@@ -258,13 +258,16 @@ and the oldest $\lceil\rho\, n_1\rceil$ instances are dropped, rounded to whole 
 \Ensure updated $W$, alarm flag
 \State find the split $W_1\cdot W_2$ with the largest $|g|/\varepsilon_s$
 \State compute $g$, $\varepsilon_s=\varepsilon(\delta_s)$, $\varepsilon_w=\varepsilon(\delta_w)$ by Eq.~\eqref{eq:eps}
-\If{$|g|\ge\varepsilon_s$} \Comment{strong evidence}
+\If{$|g|\ge\varepsilon_s$} 
+  % \Comment{strong evidence}
   \State drop all of $W_1$; $c\gets0$; \Return alarm
-\ElsIf{$|g|\ge\varepsilon_w$} \Comment{weak evidence}
+\ElsIf{$|g|\ge\varepsilon_w$} 
+  % \Comment{weak evidence}
   \If{$c=0$ \textbf{or} $\mathrm{sign}(g)=\sigma$}
     \State $c\gets c+1$; $\sigma\gets\mathrm{sign}(g)$; raise warning
   \Else
-    \State $c\gets0$ \Comment{sign flipped: release}
+    \State $c\gets0$ 
+  % \Comment{sign flipped: release}
   \EndIf
   \If{$c=k$}
     \State $\rho\gets\min(1,|g|/\varepsilon_s)$
@@ -272,7 +275,8 @@ and the oldest $\lceil\rho\, n_1\rceil$ instances are dropped, rounded to whole 
     \State $c\gets0$; \Return alarm
   \EndIf
 \Else
-  \State $c\gets0$ \Comment{no evidence: release}
+  \State $c\gets0$ 
+  % \Comment{no evidence: release}
 \EndIf
 \State \Return no alarm
 \end{algorithmic}
